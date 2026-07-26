@@ -2,6 +2,9 @@
   "name": "riverside-hms",
   "private": true,
   "version": "0.1.0",
+  "engines": {
+    "node": ">=20"
+  },
   "workspaces": [
     "frontend",
     "backend"
@@ -11,8 +14,10 @@
     "dev:frontend": "npm run dev --workspace frontend",
     "dev:backend": "npm run dev --workspace backend",
     "dev:all": "npm run dev --workspace backend & npm run dev --workspace frontend",
+    "postinstall": "npm run db:generate --workspace backend",
     "build": "npm run build --workspace frontend",
     "start": "npm run start --workspace backend",
+    "start:azure": "npm run db:push --workspace backend && npm run db:seed --workspace backend && npm run start --workspace backend",
     "db:generate": "npm run db:generate --workspace backend",
     "db:push": "npm run db:push --workspace backend",
     "db:seed": "npm run db:seed --workspace backend"

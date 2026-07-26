@@ -2,6 +2,8 @@ import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { config } from './config.js'
 import { authenticate } from './middleware/auth.js'
 import { errorHandler, notFound } from './middleware/errors.js'
@@ -54,6 +56,17 @@ export function createApp() {
   app.use('/api/treatments', treatmentRoutes)
   app.use('/api/inventory', inventoryRoutes)
   app.use('/api/shifts', shiftRoutes)
+
+  if (config.NODE_ENV === 'production') {
+    const frontendDist = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../../frontend/dist',
+    )
+    app.use(express.static(frontendDist))
+    app.get(/^(?!\/api).*/, (_req, res) => {
+      res.sendFile(path.join(frontendDist, 'index.html'))
+    })
+  }
 
   app.use(notFound)
   app.use(errorHandler)
