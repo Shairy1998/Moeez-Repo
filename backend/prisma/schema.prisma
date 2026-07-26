@@ -1,0 +1,247 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Roles: ADMIN | DOCTOR | NURSE | RECEPTIONIST | BILLING
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  name         String
+  role         String     @default("RECEPTIONIST")
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  staff        Staff?
+  auditLogs    AuditLog[]
+
+  @@index([role, active])
+}
+
+model Patient {
+  id               String        @id @default(cuid())
+  medicalRecordNo  String        @unique
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime
+  sex              String
+  phone            String?
+  email            String?
+  address          String?
+  emergencyContact String?
+  bloodGroup       String?
+  allergies        String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  appointments     Appointment[]
+  admissions       Admission[]
+  invoices         Invoice[]
+  surgeries        Surgery[]
+  treatments       Treatment[]
+
+  @@index([lastName, firstName])
+  @@index([phone])
+}
+
+model Staff {
+  id           String        @id @default(cuid())
+  employeeNo   String        @unique
+  firstName    String
+  lastName     String
+  designation  String
+  department   String?
+  phone        String?
+  email        String?       @unique
+  active       Boolean       @default(true)
+  userId       String?       @unique
+  user         User?         @relation(fields: [userId], references: [id])
+  appointments Appointment[]
+  surgeries    Surgery[]     @relation("SurgeonSurgeries")
+  treatments   Treatment[]   @relation("DoctorTreatments")
+  shifts       Shift[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([designation, active])
+}
+
+// Status: PENDING | CONFIRMED | COMPLETED | CANCELLED | NO_SHOW
+model Appointment {
+  id        String    @id @default(cuid())
+  patientId String
+  staffId   String
+  startsAt  DateTime
+  endsAt    DateTime?
+  reason    String?
+  notes     String?
+  status    String    @default("PENDING")
+  patient   Patient   @relation(fields: [patientId], references: [id])
+  staff     Staff     @relation(fields: [staffId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([startsAt, status])
+  @@index([patientId, startsAt])
+  @@index([staffId, startsAt])
+}
+
+// Status: SCHEDULED | IN_PROGRESS | COMPLETED | CANCELLED
+model Surgery {
+  id          String   @id @default(cuid())
+  patientId   String
+  surgeonId   String
+  theatre     String?
+  scheduledAt DateTime
+  durationMin Int      @default(60)
+  status      String   @default("SCHEDULED")
+  notes       String?
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  surgeon     Staff    @relation("SurgeonSurgeries", fields: [surgeonId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([scheduledAt, status])
+}
+
+// Status: ACTIVE | COMPLETED | STOPPED
+model Treatment {
+  id        String    @id @default(cuid())
+  patientId String
+  doctorId  String
+  name      String
+  dosage    String?
+  startDate DateTime
+  endDate   DateTime?
+  status    String    @default("ACTIVE")
+  notes     String?
+  patient   Patient   @relation(fields: [patientId], references: [id])
+  doctor    Staff     @relation("DoctorTreatments", fields: [doctorId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([patientId, status])
+}
+
+model InventoryItem {
+  id           String    @id @default(cuid())
+  sku          String    @unique
+  name         String
+  category     String?
+  quantity     Int       @default(0)
+  unit         String    @default("pcs")
+  reorderLevel Int       @default(10)
+  unitCost     Decimal   @default(0)
+  expiryAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([category])
+}
+
+model Shift {
+  id        String   @id @default(cuid())
+  staffId   String
+  startsAt  DateTime
+  endsAt    DateTime
+  ward      String?
+  notes     String?
+  staff     Staff    @relation(fields: [staffId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([staffId, startsAt])
+}
+
+model Bed {
+  id         String      @id @default(cuid())
+  bedNo      String      @unique
+  ward       String
+  active     Boolean     @default(true)
+  admissions Admission[]
+
+  @@index([ward, active])
+}
+
+// Status: ADMITTED | DISCHARGED | TRANSFERRED
+model Admission {
+  id           String    @id @default(cuid())
+  patientId    String
+  bedId        String?
+  admittedAt   DateTime  @default(now())
+  dischargedAt DateTime?
+  diagnosis    String?
+  status       String    @default("ADMITTED")
+  patient      Patient   @relation(fields: [patientId], references: [id])
+  bed          Bed?      @relation(fields: [bedId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([status, admittedAt])
+  @@index([bedId, status])
+  @@index([patientId, admittedAt])
+}
+
+// Status: DRAFT | ISSUED | PARTIALLY_PAID | PAID | VOID
+model Invoice {
+  id        String        @id @default(cuid())
+  invoiceNo String        @unique
+  patientId String
+  status    String        @default("DRAFT")
+  currency  String        @default("PKR")
+  subtotal  Decimal
+  discount  Decimal       @default(0)
+  tax       Decimal       @default(0)
+  total     Decimal
+  dueAt     DateTime?
+  patient   Patient       @relation(fields: [patientId], references: [id])
+  items     InvoiceItem[]
+  payments  Payment[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([patientId, createdAt])
+  @@index([status, dueAt])
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Decimal
+  amount      Decimal
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  amount      Decimal
+  method      String
+  referenceNo String?
+  paidAt      DateTime @default(now())
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId, paidAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
