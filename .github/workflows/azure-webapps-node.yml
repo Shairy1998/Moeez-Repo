@@ -1,41 +1,32 @@
 name: Deploy to Azure App Service
-
 on:
   push:
     branches:
       - main
   workflow_dispatch:
-
 env:
   AZURE_WEBAPP_NAME: moeez-webapp
   NODE_VERSION: '20.x'
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-
       - name: Install dependencie
         run: npm ci
-
       - name: Run database migrations
         working-directory: ./backend
-        run: npx prisma migrate deploy
+        run: npx prisma db push --accept-data-loss
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
       - name: Build frontend
         run: npm run build
-
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
