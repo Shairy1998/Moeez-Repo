@@ -1,32 +1,40 @@
-{
-  "name": "@riverside-hms/backend",
-  "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "scripts": {
-    "dev": "node --watch src/index.js",
-    "start": "node src/index.js",
-    "postinstall": "prisma generate",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:seed": "node prisma/seed.js",
-    "db:studio": "prisma studio"
-  },
-  "dependencies": {
-    "@prisma/client": "^6.16.0",
-    "bcryptjs": "^3.0.3",
-    "cors": "^2.8.6",
-    "dotenv": "^16.4.7",
-    "express": "^5.2.1",
-    "express-rate-limit": "^8.6.0",
-    "helmet": "^8.3.0",
-    "jsonwebtoken": "^9.0.3",
-    "zod": "^3.24.2"
-  },
-  "devDependencies": {
-    "prisma": "^6.16.0"
-  },
-  "prisma": {
-    "seed": "node prisma/seed.js"
-  }
-}
+name: Deploy to Azure App Service
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+env:
+  AZURE_WEBAPP_NAME: moeez-webapp
+  NODE_VERSION: '20.x'
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install dependencie
+        run: npm ci
+      - name: Run database migrations
+        working-directory: ./backend
+        run: npx prisma db push --accept-data-loss
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Seed database
+        working-directory: ./backend
+        run: npm run db:seed
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Build frontend
+        run: npm run build
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: .
